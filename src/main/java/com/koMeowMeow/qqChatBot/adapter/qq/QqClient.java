@@ -1,6 +1,8 @@
 package com.komeowmeow.qqchatbot.adapter.qq;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.komeowmeow.qqchatbot.config.BotConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +13,8 @@ import org.springframework.stereotype.Component;
 
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Component
 public class QqClient {
@@ -27,14 +31,14 @@ public class QqClient {
         this.eventPublisher = eventPublisher;
     }
     @EventListener(ApplicationReadyEvent.class)
-    public void connect(){
-        if(!botConfig.isEnabled()){
+    public void connect() {
+        if (!botConfig.isEnabled()) {
             log.info("QQ Bot 暂未启用");
             return;
         }
         httpClient.newWebSocketBuilder()
-                .header("Authorization","Bearer"+botConfig.getAccessToken())
-                .buildAsync(botConfig.getOneBotWebSocketUrl(),new OneBotListener(objectMapper, eventPublisher))
+                .header("Authorization", "Bearer" + botConfig.getAccessToken())
+                .buildAsync(botConfig.getOneBotWebSocketUrl(), new OneBotListener(objectMapper, eventPublisher))
                 .whenComplete((socket, error) -> {
                     if (error != null) {
                         log.error("无法连接 NapCat OneBot WebSocket", error);
@@ -45,4 +49,32 @@ public class QqClient {
                     log.info("已连接 NapCat软件：{}", botConfig.getOneBotWebSocketUrl());
                 });
     }
+        public CompletableFuture<Void> sendGroupMessage(long groupId,String text){
+            if(text==null||text.isBlank()){
+                return CompletableFuture.failedFuture(
+                    new IllegalStateException("回复内容不能为空"));
+            }
+            WebSocket socket=webSocket;
+            if(socket==null)return CompletableFuture.failedFuture(
+              new IllegalStateException("未连接到Napcat")
+            );
+
+            ObjectNode params=objectMapper.createObjectNode();
+            params.put("group_id",groupId);
+            params.put("message",text);
+            params.put("auto-escape",true);
+
+            ObjectNode request=objectMapper.createObjectNode();
+            request.put("action","send_group_msp");
+            request.put("params",params);
+            request.put("echo", UUID.randomUUID().toString());
+
+            try{
+                String payload=objectMapper.writeValueAsString(request);
+                return socket.sendText(payload,true).thenApply(ignored->null);
+            }catch(JsonProcessingException expection){
+                return CompletableFuture.failedFuture(expection);
+            }
+
+        }
 }
