@@ -16,4 +16,12 @@ public class BotConfig {
 
     public String getAccessToken(){return accessToken;}
     public void setAccessToken(String accessToken){this.accessToken=accessToken;}
+
+    private long selfId;
+    public long getSelfId(){
+        return selfId;
+    }
+    public void setSelfId(){
+        this.selfId=selfId;
+    }
 }
