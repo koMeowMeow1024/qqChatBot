@@ -65,4 +65,6 @@ public class OneBotListener implements WebSocket.Listener {
     public void onError(WebSocket webSocket, Throwable error) {
         log.error("OneBot WebSocket 发生错误", error);
     }
+
+
 }
