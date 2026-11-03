@@ -10,6 +10,7 @@ bot:
     enabled: true
     one-bot-web-socket-url: ${ONEBOT_WS_URL:ws://127.0.0.1:3001/}
     access-token: ${ONEBOT_ACCESS_TOKEN:}
+    self-id: 3761101415
 # 模型配置通过环境变量提供，避免把密钥提交到 GitHub
 langchain4j:
   open-ai:
