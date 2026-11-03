@@ -1,9 +1,11 @@
 package com.komeowmeow.qqchatbot.adapter.qq;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.komeowmeow.qqchatbot.config.BotConfig;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -15,6 +17,7 @@ import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 @Component
 public class QqClient {
@@ -75,6 +78,53 @@ public class QqClient {
             }catch(JsonProcessingException expection){
                 return CompletableFuture.failedFuture(expection);
             }
+        }
+        @PreDestroy
+        public void close(){
+            WebSocket socket=webSocket;
+            if(socket!=null)socket.sendClose(WebSocket.NORMAL_CLOSURE,"application is stop");
+        }
+        private void handleInComingText(String text){
+            try{
+                JsonNode payload=objectMapper.readTree(text);
+                if(payload.has("post_type")){
+                    eventPublisher.publishEvent(new OneBotEvent(payload));
+                    return;
+                }
+                if("failed".equals(payload.path("status").asText())){
+                    log.warn("OneBotEvent 请求失败:{}",payload);
+                }
+            }catch(JsonProcessingException exception){
+                log.warn("OneBotEvent 解析失败:{}",text,exception);
+            }
+        }
+        private class OneBotListener implements WebSocket.Listener{
+            @Override
+            public void onOpen(WebSocket socket){
+                socket.request(1);
+            }
+            @Override
+            public CompletionStage<?> onText(WebSocket socket,CharSequence data,boolean last){
+                String completeText=null;
+                synchronized(textBuffer) {
+                    textBuffer.append(data);
+                    if(last){
+                        completeText=textBuffer.toString();
+                        textBuffer.setLength(0);
+                    }
+                }
+                if(completeText!=null)handleInComingText(completeText);
+                socket.request(1);
+                return CompletableFuture.completedFuture(null);
+            }
+            @Override
+            public void onError(WebSocket socket,Throwable error){log.error("Navicat websocket发生错误",error);}
 
+            @Override
+            public CompletionStage<?> onClose(WebSocket socket,int StatusCode,String reason){
+                webSocket=null;
+                log.warn("navicat webSocket已断开：{}，{}",StatusCode,reason);
+                return CompletableFuture.completedFuture(null);
+            }
         }
 }
