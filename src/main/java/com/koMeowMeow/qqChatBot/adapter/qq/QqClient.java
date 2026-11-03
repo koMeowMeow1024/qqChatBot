@@ -41,7 +41,7 @@ public class QqClient {
         }
         httpClient.newWebSocketBuilder()
                 .header("Authorization", "Bearer" + botConfig.getAccessToken())
-                .buildAsync(botConfig.getOneBotWebSocketUrl(), new OneBotListener(objectMapper, eventPublisher))
+                .buildAsync(botConfig.getOneBotWebSocketUrl(), new OneBotListener())
                 .whenComplete((socket, error) -> {
                     if (error != null) {
                         log.error("无法连接 NapCat OneBot WebSocket", error);
@@ -99,6 +99,7 @@ public class QqClient {
             }
         }
         private class OneBotListener implements WebSocket.Listener{
+            private final StringBuilder textBuffer=new StringBuilder();
             @Override
             public void onOpen(WebSocket socket){
                 socket.request(1);
