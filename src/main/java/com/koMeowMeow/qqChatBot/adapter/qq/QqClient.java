@@ -40,7 +40,7 @@ public class QqClient {
             return;
         }
         httpClient.newWebSocketBuilder()
-                .header("Authorization", "Bearer" + botConfig.getAccessToken())
+                .header("Authorization", "Bearer " + botConfig.getAccessToken())
                 .buildAsync(botConfig.getOneBotWebSocketUrl(), new OneBotListener())
                 .whenComplete((socket, error) -> {
                     if (error != null) {
