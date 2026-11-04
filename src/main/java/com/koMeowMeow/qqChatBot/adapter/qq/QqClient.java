@@ -65,10 +65,10 @@ public class QqClient {
             ObjectNode params=objectMapper.createObjectNode();
             params.put("group_id",groupId);
             params.put("message",text);
-            params.put("auto-escape",true);
+            params.put("auto_escape",true);
 
             ObjectNode request=objectMapper.createObjectNode();
-            request.put("action","send_group_msp");
+            request.put("action","send_group_msg");
             request.put("params",params);
             request.put("echo", UUID.randomUUID().toString());
 
