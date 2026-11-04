@@ -32,6 +32,7 @@ public class QqEventListener {
         if(senderId==botConfig.getSelfId())return;
         long groupId=payload.path("group_id").asLong();
         String question=extractQuestion(payload);
+        if(question==null||question.isBlank())return;
         log.info("收到{}群{}用户的消息{}",groupId,senderId,question);
 
         CompletableFuture
