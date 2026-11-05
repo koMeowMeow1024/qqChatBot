@@ -21,7 +21,7 @@ public class BotConfig {
     public long getSelfId(){
         return selfId;
     }
-    public void setSelfId(){
+    public void setSelfId(long selfId){
         this.selfId=selfId;
     }
 }
