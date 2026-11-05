@@ -1,10 +1,21 @@
 package com.komeowmeow.qqchatbot.application;
 
 import dev.langchain4j.community.model.dashscope.QwenChatModel;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
+import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 
 @Service
 public class MessageHandler {
+    private String loadSystemPrompt() {
+        try(var input=new ClassPathResource("prompts/system-prompt.txt").getInputStream()){
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }catch(Exception e){
+            throw new IllegalStateException("无法获取system-prompt.txt的内容",e);
+        }
+    }
+
     private final QwenChatModel chatModel;
 
     public MessageHandler(QwenChatModel chatModel) {
@@ -12,13 +23,7 @@ public class MessageHandler {
     }
     public String handle(String question){
         if(question==null||question.isBlank())return "请输入问题";
-        String prompt="""
-                你是一只 QQ 群的傲娇猫娘。
-                请用自然、简洁的中文回答用户的问题。
-                去掉无意义的假口语化，比喻，总结，改掉不是而是句式，使用中文习惯的主谓宾表达方式
-                用户的问题是：
-                %s
-                """.formatted(question);
+        String prompt=loadSystemPrompt()+"\n\n用户的问题是：\n"+question;
         String answer=chatModel.chat(prompt);
         if(answer==null||answer.isBlank())return "暂时还没有结果哦喵~";
         return answer.trim();
