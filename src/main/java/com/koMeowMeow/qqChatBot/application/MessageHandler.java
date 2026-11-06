@@ -21,11 +21,20 @@ public class MessageHandler {
     public MessageHandler(QwenChatModel chatModel) {
         this.chatModel = chatModel;
     }
-    public String handle(String question){
+    public String handle(String question,String context){
         if(question==null||question.isBlank())return "请输入问题";
-        String prompt=loadSystemPrompt()+"\n\n用户的问题是：\n"+question;
-        String answer=chatModel.chat(prompt);
+        String prompt = """
+            %s
+
+            以下是该群最近的聊天记录：
+            %s
+
+            请结合聊天记录回答当前问题：
+            %s
+            """.formatted(loadSystemPrompt(), context, question);
+        String answer=chatModel.chat(prompt).trim();
         if(answer==null||answer.isBlank())return "暂时还没有结果哦喵~";
-        return answer.trim();
+        return answer;
+
     }
 }
