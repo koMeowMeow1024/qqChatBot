@@ -1,10 +1,9 @@
 package com.komeowmeow.qqchatbot.infrastructure.persistence;
-
-import dev.langchain4j.data.message.ChatMessage;
+import org.springframework.stereotype.Repository;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
-
+@Repository
 public class ChatMessageRepository {
     private final JdbcTemplate jdbcTemplate;
 
@@ -13,7 +12,7 @@ public class ChatMessageRepository {
     }
 
     public void save(long groupId,long userId,String role,String context) {
-        if (!"user".equals(role) || !"assistant".equals(role))
+        if (!"user".equals(role) && !"assistant".equals(role))
             throw new IllegalStateException("role只能是user或assistant");
         jdbcTemplate.update("""
                 INSERT INTO chat_message (group_id, user_id, role, content)
