@@ -36,7 +36,7 @@ public class QqEventListener {
         log.info("收到{}群{}用户的消息{}",groupId,senderId,question);
 
         CompletableFuture
-                .supplyAsync(()-> conversationService.reply(question))
+                .supplyAsync(()-> conversationService.reply(groupId,senderId,question))
                 .thenCompose(answer->qqClient.sendGroupMessage(groupId,answer))
                 .exceptionally(error->{log.error("qq消息处理失败",error);return null;});
     }
