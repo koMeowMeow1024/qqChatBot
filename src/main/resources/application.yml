@@ -2,8 +2,12 @@ spring:
   application:
     name: qq-chat-bot
   datasource:
-    url: "jdbc:sqlite:qq-chat-bot.db"
+    # busy_timeout 避免并发写立即报 SQLITE_BUSY，WAL 提升读写并发
+    url: "jdbc:sqlite:qq-chat-bot.db?busy_timeout=5000&journal_mode=WAL"
     driver-class-name: org.sqlite.JDBC
+    hikari:
+      # SQLite 同一时刻只允许一个写者，单连接最稳
+      maximum-pool-size: 1
   sql:
     init:
       mode: always
@@ -19,12 +23,6 @@ bot:
     self-id: 3761101415
 
 # 模型配置通过环境变量提供，避免把密钥提交到 GitHub
-langchain4j:
-  open-ai:
-    chat-model:
-      api-key: ${LLM_API_KEY:}
-      model-name: ${LLM_MODEL_NAME:gpt-4o-mini}
-      base-url: ${LLM_BASE_URL:https://api.openai.com/v1}
 ai:
   dashscope:
     model: ${DASHSCOPE_MODEL:qwen3.7-flash}

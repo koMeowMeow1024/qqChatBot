@@ -1,7 +1,6 @@
 package com.komeowmeow.qqchatbot;
 
 import com.komeowmeow.qqchatbot.config.BotConfig;
-import dev.langchain4j.community.model.dashscope.QwenChatModel;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
