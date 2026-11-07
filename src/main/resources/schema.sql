@@ -7,5 +7,7 @@ CREATE TABLE IF NOT EXISTS chat_message (
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_chat_message_group_time
-    ON chat_message(group_id, created_at);
+-- 查询按 (group_id, id) 取最近记录，旧索引按时间建，重建为匹配查询的索引
+DROP INDEX IF EXISTS idx_chat_message_group_time;
+CREATE INDEX IF NOT EXISTS idx_chat_message_group_id
+    ON chat_message(group_id, id);
