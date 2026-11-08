@@ -16,9 +16,11 @@ import org.springframework.stereotype.Component;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.time.Duration;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class QqClient {
     private static final Logger log = LoggerFactory.getLogger(QqClient.class);
     private static final long SEND_TIMEOUT_SECONDS = 10;
+    private static final long API_TIMEOUT_SECONDS = 15;
     private static final long MAX_RECONNECT_DELAY_SECONDS = 30;
 
     private final BotConfig botConfig;
@@ -44,6 +47,8 @@ public class QqClient {
     });
     private final AtomicBoolean reconnectScheduled = new AtomicBoolean(false);
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
+
+    private final Map<String, CompletableFuture<JsonNode>> pendingApiCalls = new ConcurrentHashMap<>();
 
     private volatile WebSocket webSocket;
     private volatile boolean shuttingDown;
@@ -108,6 +113,56 @@ public class QqClient {
         }, delaySeconds, TimeUnit.SECONDS);
     }
 
+    public CompletableFuture<JsonNode> callAction(String action, JsonNode params) {
+        WebSocket socket = webSocket;
+        if (socket == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("未连接到 NapCat"));
+        }
+
+        String echo = UUID.randomUUID().toString();
+        CompletableFuture<JsonNode> responseFuture = new CompletableFuture<>();
+        pendingApiCalls.put(echo, responseFuture);
+        responseFuture.orTimeout(API_TIMEOUT_SECONDS, TimeUnit.SECONDS).whenComplete((ignored, error) -> {
+            pendingApiCalls.remove(echo);
+            if (error != null && !responseFuture.isDone()) {
+                responseFuture.completeExceptionally(error);
+            }
+        });
+
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put("action", action);
+        request.set("params", params == null ? objectMapper.createObjectNode() : params);
+        request.put("echo", echo);
+
+        try {
+            String payload = objectMapper.writeValueAsString(request);
+            return socket.sendText(payload, true)
+                    .thenCompose(ignored -> responseFuture)
+                    .thenApply(response -> {
+                        if (response.path("retcode").asInt(-1) != 0) {
+                            throw new IllegalStateException(
+                                    "OneBot " + action + " 失败：" + response);
+                        }
+                        return response.path("data");
+                    });
+        } catch (JsonProcessingException exception) {
+            pendingApiCalls.remove(echo);
+            return CompletableFuture.failedFuture(exception);
+        }
+    }
+
+    public CompletableFuture<JsonNode> getMessage(long messageId) {
+        ObjectNode params = objectMapper.createObjectNode();
+        params.put("message_id", messageId);
+        return callAction("get_msg", params);
+    }
+
+    public CompletableFuture<JsonNode> getImage(String file) {
+        ObjectNode params = objectMapper.createObjectNode();
+        params.put("file", file);
+        return callAction("get_image", params);
+    }
+
     public CompletableFuture<Void> sendGroupMessage(long groupId, String text) {
         if (text == null || text.isBlank()) {
             return CompletableFuture.failedFuture(
@@ -156,6 +211,14 @@ public class QqClient {
             if (payload.has("post_type")) {
                 eventPublisher.publishEvent(new OneBotEvent(payload));
                 return;
+            }
+            if (payload.has("echo")) {
+                String echo = payload.get("echo").asText();
+                CompletableFuture<JsonNode> pending = pendingApiCalls.remove(echo);
+                if (pending != null) {
+                    pending.complete(payload);
+                    return;
+                }
             }
             if ("failed".equals(payload.path("status").asText())) {
                 log.warn("OneBot 请求失败：{}", payload);

@@ -17,13 +17,14 @@ public class AiConfig {
     @Bean
     public QwenChatModel qwenChatModel(
             @Value("${ai.dashscope.model:qwen3.7-flash}") String modelName) {
+        return buildQwenModel(modelName);
+    }
 
+    private static QwenChatModel buildQwenModel(String modelName) {
         String apiKey = System.getenv("DASHSCOPE_API_KEY");
-
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("未配置环境变量 DASHSCOPE_API_KEY");
         }
-
         return QwenChatModel.builder()
                 .apiKey(apiKey)
                 .modelName(modelName)

@@ -2,6 +2,7 @@ package com.komeowmeow.qqchatbot.adapter.qq;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.komeowmeow.qqchatbot.application.ConversationService;
+import com.komeowmeow.qqchatbot.application.UserQuestion;
 import com.komeowmeow.qqchatbot.config.BotConfig;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -20,12 +21,18 @@ public class QqEventListener {
     private final QqClient qqClient;
     private final BotConfig botConfig;
     private final ConversationService conversationService;
+    private final GroupQuestionAssembler questionAssembler;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
-    public QqEventListener(QqClient qqClient, BotConfig botConfig, ConversationService conversationService) {
+    public QqEventListener(
+            QqClient qqClient,
+            BotConfig botConfig,
+            ConversationService conversationService,
+            GroupQuestionAssembler questionAssembler) {
         this.qqClient = qqClient;
         this.botConfig = botConfig;
         this.conversationService = conversationService;
+        this.questionAssembler = questionAssembler;
     }
 
     @EventListener
@@ -41,47 +48,30 @@ public class QqEventListener {
             return;
         }
         long groupId = payload.path("group_id").asLong();
-        String question = extractQuestion(payload);
-        if (question == null || question.isBlank()) {
-            return;
-        }
-        log.info("收到群 {} 用户 {} 的消息：{}", groupId, senderId, question);
 
-        CompletableFuture
-                .supplyAsync(() -> conversationService.reply(groupId, senderId, question), executor)
-                .thenCompose(answer -> qqClient.sendGroupMessage(groupId, answer))
+        questionAssembler.assembleAsync(payload)
+                .thenCompose(result -> {
+                    if (result.question() == null) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    UserQuestion question = result.question();
+                    if (result.imageExpectedButFailed()) {
+                        return qqClient.sendGroupMessage(groupId, "这张图我这边打不开喵，重新发一张试试？");
+                    }
+                    if (question.hasImages()) {
+                        log.info("收到群 {} 用户 {} 的消息（含 {} 张图）：{}", groupId, senderId,
+                                question.images().size(), question.effectiveText());
+                    } else {
+                        log.info("收到群 {} 用户 {} 的消息：{}", groupId, senderId, question.effectiveText());
+                    }
+                    return CompletableFuture
+                            .supplyAsync(() -> conversationService.reply(groupId, senderId, question), executor)
+                            .thenCompose(answer -> qqClient.sendGroupMessage(groupId, answer));
+                })
                 .exceptionally(error -> {
                     log.error("QQ 消息处理失败", error);
                     return null;
                 });
-    }
-
-    private String extractQuestion(JsonNode payload) {
-        JsonNode message = payload.path("message");
-        if (message.isArray()) {
-            boolean mentionedBot = false;
-            StringBuilder text = new StringBuilder();
-
-            for (JsonNode segment : message) {
-                String type = segment.path("type").asText();
-                if ("at".equals(type) && String.valueOf(botConfig.getSelfId())
-                        .equals(segment.path("data").path("qq").asText())) {
-                    mentionedBot = true;
-                    continue;
-                }
-                if ("text".equals(type)) {
-                    text.append(segment.path("data").path("text").asText());
-                }
-            }
-            return mentionedBot ? text.toString().trim() : null;
-        }
-
-        String rawMessage = payload.path("raw_message").asText();
-        String atCode = "[CQ:at,qq=" + botConfig.getSelfId() + "]";
-        if (!rawMessage.contains(atCode)) {
-            return null;
-        }
-        return rawMessage.replace(atCode, "").trim();
     }
 
     @PreDestroy
