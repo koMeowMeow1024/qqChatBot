@@ -50,6 +50,15 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring-boot.version}</version>
+                <!-- 项目未继承 spring-boot-starter-parent，repackage 不会自动绑定，
+                     必须显式声明，否则 mvn package 产出的 jar 没有 Main-Class，java -jar 无法启动 -->
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

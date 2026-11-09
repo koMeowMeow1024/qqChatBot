@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS chat_message (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         group_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
+        user_name TEXT NOT NULL DEFAULT '',
         role TEXT NOT NULL,
         content TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
